@@ -2,6 +2,24 @@
 -- Instead of event handlers, this wrapper returns events one by one.
 -- This allows the event consumer to maintain control flow.
 
+-- Expat.Wrapper gives Expat a little XML at a time, and collects the
+-- generated events in a queue. Once Expat has finished with its piece
+-- of XML, it returns, allowing the caller to process the events in
+-- its own time.
+-- This allows the XML consumer to look something like this:
+--    if Event is <outer> then
+--       Parser.Next;
+--       if Event is <inner> then
+--          Parser.Next
+--          ...
+-- instead of:
+--    procedure On_Start_Tag is begin
+--       case State is
+--          when Found_Outer => (look for inner)
+--          when Found_Inner => ...
+--          ...
+-- making it much easier to process XML.
+
 -- TODO: Handle more events.
 -- TODO: Handle parse errors.
 
@@ -12,9 +30,6 @@ with Ada.Containers.Indefinite_Vectors;
 with Ada.Streams.Stream_IO;
 
 package Expat.Wrapper is
-
-   package String_Vectors is new Ada.Containers.Vectors
-     (Positive, Unbounded_String);
 
    type Attribute is record
       Name, Value: Unbounded_String;
@@ -27,6 +42,7 @@ package Expat.Wrapper is
    type Parser_Type (File: not null access Ada.Streams.Stream_IO.File_Type)
       is new Ada.Finalization.Limited_Controlled with private;
 
+   -- Kind of parse event.
    type Event_Kind is (
       End_Of_File,
       Start_Element,
@@ -36,33 +52,28 @@ package Expat.Wrapper is
       Start_Cdata,
       End_Cdata);
 
-   type Event_Type (Kind: Event_Kind := End_Of_File) is
+   -- Information about an event.
+   type Event_Info (Kind: Event_Kind := End_Of_File) is
    record
       case Kind is
-         when End_Of_File =>
-            null;
          when Start_Element | End_Element =>
-            Name        : Unbounded_String;
+            Name: Unbounded_String;
             case Kind is
                when Start_Element =>
-                  Attributes  : Attribute_Vectors.Vector;
+                  Attributes: Attribute_Vectors.Vector;
                when others => null;
             end case;
          when Character_Data | Comment =>
-            Text        : Unbounded_String;
-         when Start_Cdata | End_Cdata =>
-            null;
+            Text: Unbounded_String;
+         when End_Of_File | Start_Cdata | End_Cdata => null;
       end case;
    end record;
-
-   package Event_Vectors is new Ada.Containers.Indefinite_Vectors
-     (Positive, Event_Type);
 
    No_Event: exception;
    Parse_Error: exception;
 
    -- Return current event (raise No_Event if no current event).
-   function Event (Parser: Parser_Type) return Event_Type;
+   function Event (Parser: Parser_Type) return Event_Info;
 
    procedure Next (Parser: in out Parser_Type);
 
@@ -71,10 +82,12 @@ package Expat.Wrapper is
 
 private
 
+   package Event_Vectors is new Ada.Containers.Indefinite_Vectors
+     (Positive, Event_Info);
+
+   -- The userdata that is passed to Expat.
    type UD_Type (Parser: not null access Parser_Type)
       is new Userdata with null record;
-
-   type UD_Access is access all UD_Type;
 
    type Parser_Type (File: access Ada.Streams.Stream_IO.File_Type)
       is new Ada.Finalization.Limited_Controlled with

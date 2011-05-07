@@ -7,7 +7,7 @@ package body Expat.Wrapper is
    use type Ada.Containers.Count_Type;
    use type Interfaces.C.Strings.chars_ptr;
 
-   function Event (Parser: Parser_Type) return Event_Type
+   function Event (Parser: Parser_Type) return Event_Info
    is begin
       if Parser.Event_Queue.Length = 0 then
          raise No_Event;

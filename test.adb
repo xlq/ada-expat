@@ -6,7 +6,7 @@ with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 procedure Test is
    F: aliased Ada.Streams.Stream_IO.File_Type;
    Parser: Expat.Wrapper.Parser_Type (F'Access);
-   Event: Event_Type;
+   Event: Event_Info;
 begin
    Open (F, In_File, "/usr/share/xcb/xproto.xml");
    Parser.Next;
