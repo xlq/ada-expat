@@ -69,6 +69,12 @@ package body Expat.Wrapper is
       return To_Unbounded_String(Interfaces.C.Strings.Value(S));
    end To_Unbounded_String;
 
+   function To_Unbounded_String (S: XML_Char_p; Length: C.size_t)
+      return Unbounded_String
+   is begin
+      return To_Unbounded_String(Interfaces.C.Strings.Value(S, Length));
+   end To_Unbounded_String;
+
    function To_Attributes (S_List: XML_Char_p_p)
       return Attribute_Vectors.Vector
    is
@@ -129,6 +135,60 @@ package body Expat.Wrapper is
          Name        => To_Unbounded_String(name)));
    end End_Element_Handler;
 
+   procedure Character_Data_Handler (
+      userData    : Userdata_Access;
+      s           : XML_Char_p;
+      len         : C.int);
+   pragma Convention (C, Character_Data_Handler);
+   procedure Character_Data_Handler (
+      userData    : Userdata_Access;
+      s           : XML_Char_p;
+      len         : C.int)
+   is
+      Parser      : not null access Parser_Type := Get_Self (userData);
+   begin
+      Parser.Event_Queue.Append ((
+         Kind        => Character_Data,
+         Text        => To_Unbounded_String(s, C.size_t(len))));
+   end Character_Data_Handler;
+
+   procedure Comment_Handler (
+      userData    : Userdata_Access;
+      data        : XML_Char_p);
+   pragma Convention (C, Comment_Handler);
+   procedure Comment_Handler (
+      userData    : Userdata_Access;
+      data        : XML_Char_p)
+   is
+      Parser      : not null access Parser_Type := Get_Self (userData);
+   begin
+      Parser.Event_Queue.Append ((
+         Kind        => Comment,
+         Text        => To_Unbounded_String(data)));
+   end Comment_Handler;
+
+   procedure Start_Cdata_Handler (
+      userData    : Userdata_Access);
+   pragma Convention (C, Start_Cdata_Handler);
+   procedure Start_Cdata_Handler (
+      userData    : Userdata_Access)
+   is
+      Parser      : not null access Parser_Type := Get_Self (userData);
+   begin
+      Parser.Event_Queue.Append ((Kind => Start_Cdata));
+   end Start_Cdata_Handler;
+
+   procedure End_Cdata_Handler (
+      userData    : Userdata_Access);
+   pragma Convention (C, End_Cdata_Handler);
+   procedure End_Cdata_Handler (
+      userData    : Userdata_Access)
+   is
+      Parser      : not null access Parser_Type := Get_Self (userData);
+   begin
+      Parser.Event_Queue.Append ((Kind => End_Cdata));
+   end End_Cdata_Handler;
+
    overriding procedure Initialize (Parser: in out Parser_Type)
    is begin
       Parser.Parser := XML_ParserCreate;
@@ -136,6 +196,11 @@ package body Expat.Wrapper is
       XML_SetElementHandler (Parser.Parser,
          Start_Element_Handler'Access,
          End_Element_Handler'Access);
+      XML_SetCommentHandler (Parser.Parser, Comment_Handler'Access);
+      XML_SetCdataSectionHandler (Parser.Parser,
+         Start_Cdata_Handler'Access, End_Cdata_Handler'Access);
+      XML_SetCharacterDataHandler (Parser.Parser,
+         Character_Data_Handler'Access);
    end Initialize;
 
    overriding procedure Finalize (Parser: in out Parser_Type)
