@@ -51,10 +51,18 @@ package Expat.Wrapper is
       Comment,
       Start_Cdata,
       End_Cdata);
+   
+   type Line_Number is new Natural;
+   type Column_Number is new Natural;
+   type File_Location is record
+      Line: Line_Number;
+      Column: Column_Number;
+   end record;
 
    -- Information about an event.
    type Event_Info (Kind: Event_Kind := End_Of_File) is
    record
+      Where: File_Location;
       case Kind is
          when Start_Element | End_Element =>
             Name: Unbounded_String;
@@ -81,6 +89,8 @@ package Expat.Wrapper is
    overriding procedure Finalize (Parser: in out Parser_Type);
 
 private
+
+   function Pos (Parser: Parser_Type) return File_Location;
 
    package Event_Vectors is new Ada.Containers.Indefinite_Vectors
      (Positive, Event_Info);

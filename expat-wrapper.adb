@@ -34,7 +34,9 @@ package body Expat.Wrapper is
         (System.Address, XML_LChar_p);
    begin
       if End_Of_File (Parser.File.all) then
-         Parser.Event_Queue.Append ((Kind => End_Of_File));
+         Parser.Event_Queue.Append ((
+            Kind => End_Of_File,
+            Where => Parser.Pos));
       else
          Read (Parser.File.all, Buffer, Last);
          Status := XML_Parse (Parser.Parser, 
@@ -116,6 +118,7 @@ package body Expat.Wrapper is
    begin
       Parser.Event_Queue.Append ((
          Kind        => Start_Element,
+         Where        => Parser.Pos,
          Name        => To_Unbounded_String(name),
          Attributes  => To_Attributes(atts)));
    end Start_Element_Handler;
@@ -132,6 +135,7 @@ package body Expat.Wrapper is
    begin
       Parser.Event_Queue.Append ((
          Kind        => End_Element,
+         Where        => Parser.Pos,
          Name        => To_Unbounded_String(name)));
    end End_Element_Handler;
 
@@ -149,6 +153,7 @@ package body Expat.Wrapper is
    begin
       Parser.Event_Queue.Append ((
          Kind        => Character_Data,
+         Where        => Parser.Pos,
          Text        => To_Unbounded_String(s, C.size_t(len))));
    end Character_Data_Handler;
 
@@ -164,6 +169,7 @@ package body Expat.Wrapper is
    begin
       Parser.Event_Queue.Append ((
          Kind        => Comment,
+         Where        => Parser.Pos,
          Text        => To_Unbounded_String(data)));
    end Comment_Handler;
 
@@ -175,7 +181,9 @@ package body Expat.Wrapper is
    is
       Parser      : not null access Parser_Type := Get_Self (userData);
    begin
-      Parser.Event_Queue.Append ((Kind => Start_Cdata));
+      Parser.Event_Queue.Append ((
+         Kind => Start_Cdata,
+         Where => Parser.Pos));
    end Start_Cdata_Handler;
 
    procedure End_Cdata_Handler (
@@ -186,7 +194,9 @@ package body Expat.Wrapper is
    is
       Parser      : not null access Parser_Type := Get_Self (userData);
    begin
-      Parser.Event_Queue.Append ((Kind => End_Cdata));
+      Parser.Event_Queue.Append ((
+         Kind => End_Cdata,
+         Where => Parser.Pos));
    end End_Cdata_Handler;
 
    overriding procedure Initialize (Parser: in out Parser_Type)
@@ -207,5 +217,14 @@ package body Expat.Wrapper is
    is begin
       XML_ParserFree (Parser.Parser);
    end Finalize;
+
+   function Pos (Parser: Parser_Type) return File_Location
+   is begin
+      return (
+         Line => Line_Number (
+            XML_GetCurrentLineNumber (Parser.Parser)),
+         Column => Column_Number (
+            XML_GetCurrentColumnNumber (Parser.Parser)));
+   end Pos;
 
 end Expat.Wrapper;
